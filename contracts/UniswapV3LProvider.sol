@@ -64,6 +64,11 @@ contract UniswapV3LProvider is IERC721Receiver {
         });
     }
 
+    function width (uint160 upperPrice, uint160 lowerPrice) internal pure returns(uint160 width) {
+        width = (upperPrice - lowerPrice) * 10000 / (lowerPrice + upperPrice);
+    }
+
+
     /// @notice Calls the mint function defined in periphery, mints the same amount of each token.
     /// For this example we are providing 1000 DAI and 1000 USDC in liquidity
     /// @return tokenId The id of the newly minted ERC721
@@ -74,7 +79,9 @@ contract UniswapV3LProvider is IERC721Receiver {
     function mintNewPosition(
         address pool,
         uint256 amount0ToMint,
-        uint256 amount1ToMint
+        uint256 amount1ToMint,
+        uint160 sqrtPriceX96Lower,
+        uint160 sqrtPriceX96Upper
     )
         external
         returns (
@@ -112,13 +119,16 @@ contract UniswapV3LProvider is IERC721Receiver {
             amount1ToMint
         );
 
+        (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+
+
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager
             .MintParams({
                 token0: _pool.token0(),
                 token1: _pool.token1(),
                 fee: _pool.fee(),
-                tickLower: TickMath.MIN_TICK,
-                tickUpper: TickMath.MAX_TICK,
+                tickLower: TickMath.getTickAtSqrtRatio(sqrtPriceX96 - width(sqrtPriceX96Lower, sqrtPriceX96Upper)),
+                tickUpper: TickMath.getTickAtSqrtRatio(sqrtPriceX96 + width(sqrtPriceX96Lower, sqrtPriceX96Upper)),
                 amount0Desired: amount0ToMint,
                 amount1Desired: amount1ToMint,
                 amount0Min: 0, //WARNING
